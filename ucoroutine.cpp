@@ -1,4 +1,6 @@
 #include "ucoroutine.h"
+#include <iostream>
+using namespace std;
 
 int ucoroutine_create(schedule_t &schedule, Func func, void* arg)
 {
@@ -32,6 +34,10 @@ void ucoroutine_body(schedule_t *ps)
 	if (id != -1) {
 		ucoroutine_t *t = &(ps->coroutines[id]);
 		t->func(t->arg);
+		// 模拟函数阻塞，进行调度。可以实现一个调度算法，libco 将这里的阻塞事件注入到了 epoll 中
+		puts("before yield");
+		ucoroutine_yield(*ps);
+		puts("after yield");
 		t->state = IDLE;
 		ps->running_coroutine = -1;
 	}
@@ -56,7 +62,7 @@ void ucoroutine_resume(schedule_t &schedule, int id)
 
 			schedule.running_coroutine = id;
 			makecontext(&(t->ctx), (void(*)(void))(ucoroutine_body), 1, &schedule);
-
+			
 		case SUSPEND:
 			swapcontext(&(schedule.main), &(t->ctx));
 			break;
@@ -66,11 +72,14 @@ void ucoroutine_resume(schedule_t &schedule, int id)
 
 void ucoroutine_yield(schedule_t &schedule)
 {
+	puts("ucoroutine_yield executed.");
 	if (schedule.running_coroutine != -1) {
 		ucoroutine_t *t = &(schedule.coroutines[schedule.running_coroutine]);
 		t->state = SUSPEND;
 		schedule.running_coroutine = -1;
+		// 将控制权还给主线程
 		swapcontext(&(t->ctx), &(schedule.main));
+		cout << "Back to yield, Do nothing" << endl;
 	}
 }
 
